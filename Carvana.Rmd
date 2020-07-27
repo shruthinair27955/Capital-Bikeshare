@@ -1,0 +1,260 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  pdf_document:
+    latex_engine: xelatex
+  html_notebook: default
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+
+# This chunk shows/hides the code in your final report. When echo = TRUE, the code
+# is shown in the report. When echo = FALSE, the code is hidden from the final report.
+# We would like to see your code, so please leave the setting as is during the course.
+# This chunk will not show up in your reports, so you can safely ignore its existence.
+
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+The following is your first chunk to start with. Remember, you can add chunks using the menu
+above (Insert -> R) or using the keyboard shortcut Ctrl+Alt+I. A good practice is to use
+different code chunks to answer different questions. You can delete this comment if you like.
+
+Other useful keyboard shortcuts include Alt- for the assignment operator, and Ctrl+Shift+M
+for the pipe operator. You can delete these reminders if you don't want them in your report.
+
+
+```{r}
+setwd("/Users/shruthinair/Desktop/Lumos/DM") #Don't forget to set your working directory before you start!
+
+library("tidyverse")
+library("tidymodels")
+library("plotly")
+library("skimr")
+```
+```{r}
+dfbOrg <-
+read_csv("/Users/shruthinair/Desktop/Lumos/DM/Data/assignment2BikeShare.csv")
+```
+```{r}
+skim(dfbOrg)
+```
+
+Question 1:
+a. Create additional variables:
+
+```{r}
+dfbOrg <- dfbOrg %>%
+  mutate(COUNT = CASUAL + REGISTERED) %>%
+  mutate(MONTH = months(DATE))
+
+```
+
+b. Scale:
+
+```{r}
+dfbStd <- dfbOrg %>%
+   mutate_at(c(5:8), funs(c(scale(.))))
+```
+
+Question 2:
+
+```{r}
+fitAll <-
+  lm(formula = COUNT ~ ., data = dfbStd)
+summary(fitAll)
+```
+```{r}
+plot(fitAll)
+```
+
+
+Question 3:
+
+a. Adding BADWEATHER:
+```{r}
+dfbOrg <- dfbOrg %>%
+  mutate(BADWEATHER = ifelse(WEATHERSIT == 3 | WEATHERSIT == 4, "YES", "NO"))
+```
+
+b. Scatterplot:
+```{r}
+dfbOrg %>%
+ggplot(mapping = aes(x=ATEMP,y=COUNT, color =BADWEATHER)) + geom_point()
+```
+
+c: Scatterplots:
+```{r}
+dfbOrg %>%
+ggplot(mapping = aes(x=ATEMP,y=CASUAL, color =BADWEATHER)) + geom_point()
+
+```
+
+```{r}
+dfbOrg %>%
+ggplot(mapping = aes(x=ATEMP,y=REGISTERED, color =BADWEATHER)) + geom_point()
+```
+Question 3 (iv):
+
+```{r}
+dfbOrg %>%
+ggplot(mapping = aes(x=ATEMP,y=COUNT)) + geom_point() + geom_smooth()
+```
+
+Question 4:
+```{r}
+fitCount <-
+  lm(formula = COUNT ~ MONTH + WEEKDAY + BADWEATHER + TEMP + ATEMP + HUMIDITY, data = dfbOrg)
+summary(fitCount)
+```
+
+Question 5:
+```{r}
+plot(fitCount)
+```
+
+Heteroskedasticity found. (Plot)
+
+```{r}
+car::vif(fitCount)
+```
+```{r}
+fitCountMod <-
+  lm(formula = COUNT ~ WEEKDAY + MONTH + ATEMP + BADWEATHER + HUMIDITY + ATEMP*BADWEATHER, data = dfbOrg)
+summary(fitCountMod) 
+```
+
+```{r}
+plot(fitCountMod)
+```
+
+```{r}
+car::vif(fitCountMod)
+```
+
+Question 6:
+a.
+```{r}
+fitBadWt <-
+  lm(formula = COUNT ~ BADWEATHER, data = dfbOrg)
+summary(fitBadWt)
+```
+
+c. 
+```{r}
+fitBadWtWeekday <-
+  lm(formula = COUNT ~ BADWEATHER + WEEKDAY + BADWEATHER*WEEKDAY, data = dfbOrg)
+summary(fitBadWtWeekday)
+```
+
+Question 7:
+a
+```{r}
+set.seed(333)
+```
+
+b
+```{r}
+dfbTrain <- dfbOrg %>% sample_frac(0.8)
+dfbTest <- setdiff(dfbOrg, dfbTrain)
+```
+
+c
+```{r}
+fitOrg <-
+  lm(formula = COUNT ~ WEEKDAY + MONTH + ATEMP + BADWEATHER + HUMIDITY + ATEMP*BADWEATHER, data = dfbTrain)
+summary(fitOrg)
+```
+
+```{r}
+resultsOrg <- dfbTest %>%
+  			mutate(PREDICTEDCOUNT = predict(fitOrg, dfbTest))
+resultsOrg
+```
+
+```{r}
+performance <- metric_set(rmse, mae)
+performance(resultsOrg, truth=COUNT, estimate=PREDICTEDCOUNT)
+```
+
+```{r}
+fitNew <-
+  lm(formula = COUNT ~ WEEKDAY + MONTH + ATEMP + BADWEATHER + HUMIDITY + WINDSPEED + ATEMP*BADWEATHER, data = dfbTrain)
+summary(fitNew)
+```
+
+```{r}
+resultsNew <- dfbTest %>%
+ mutate(PREDICTEDCOUNT = predict(fitNew, dfbTest))
+resultsNew
+```
+
+```{r}
+performance <- metric_set(rmse, mae)
+performance(resultsNew, truth=COUNT, estimate=PREDICTEDCOUNT)
+```
+
+Question 8:
+Model 1:
+
+```{r}
+dfbOrgTs <- dfbOrg %>%
+  mutate(YEAR = lubridate::year(DATE))
+```
+
+
+```{r}
+dfbTrainTs <- dfbOrgTs %>% filter( YEAR == 2011)
+dfbTestTs <- setdiff(dfbOrgTs, dfbTrainTs)
+```
+
+```{r}
+fitOrgTs <-
+  lm(formula = COUNT ~ WEEKDAY + MONTH + ATEMP + BADWEATHER + HUMIDITY + ATEMP*BADWEATHER, data = dfbTrainTs)
+summary(fitOrgTs)
+```
+
+```{r}
+resultsTs <- dfbTestTs %>%
+  			mutate(PREDICTEDCOUNT = predict(fitOrg, dfbTestTs))
+resultsTs
+```
+
+```{r}
+performance <- metric_set(rmse, mae)
+performance(resultsTs, truth=COUNT, estimate=PREDICTEDCOUNT)
+```
+
+Model 2:
+
+```{r}
+dfbTrainTs1 <- dfbOrgTs %>%
+  filter("2011-01-01" <= DATE & DATE < "2012-06-01")
+dfbTestTs1 <- dplyr::setdiff(dfbOrgTs, dfbTrainTs1)
+```
+
+
+```{r}
+fitNewTs1 <- lm(COUNT ~ MONTH + WEEKDAY + BADWEATHER*ATEMP + HUMIDITY + HOLIDAY, data = dfbTrainTs1)
+summary(fitNewTs1)
+```
+
+```{r}
+
+resultsNewTs1 <- dfbTestTs1 %>%
+  			mutate(predictedCount = predict(fitNewTs1, dfbTestTs1))
+
+resultsNewTs1
+
+```
+```{r}
+
+performanceB <- metric_set(rmse, mae)
+performanceB(resultsNewTs1, truth = COUNT, estimate = predictedCount)
+
+```
+
